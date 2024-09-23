@@ -529,4 +529,7 @@ class WhisperWebUIFasterWhisperEngine:
     def delete(self) -> None:
         self._inferencer.delete()
 
+    def __str__(self):
+        return 'Whisper WebUI Faster Whisper'
+
 __all__ = ['Engines', 'Engine', 'WhisperWebUIFasterWhisperEngine']
