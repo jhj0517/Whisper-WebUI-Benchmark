@@ -12,4 +12,4 @@ pvleopard==2.0.1
 pytube
 requests
 soundfile
-openai-whisper==20231117
+# openai-whisper==20231117
