@@ -3,8 +3,11 @@ import os
 import random
 from argparse import ArgumentParser
 from collections import namedtuple
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from typing import *
+import gradio as gr
+from dataclasses import dataclass, asdict
+import copy
 
 import editdistance
 
@@ -12,17 +15,33 @@ from dataset import *
 from engine import *
 from normalizer import Normalizer
 
+
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), 'Whisper-WebUI'))
+from modules.whisper.faster_whisper_inference import FasterWhisperInference
+from modules.whisper.whisper_base import WhisperBase
+from modules.whisper.whisper_parameter import WhisperValues
+
+
 WorkerResult = namedtuple('WorkerResult', ['num_errors', 'num_words', 'audio_sec', 'process_sec'])
 RESULTS_FOLDER = os.path.join(os.path.dirname(__file__), "results")
 
+WHISPER_MODEL_DIR = "Whisper-WebUI/models"
+FASTER_WHISPER_MODEL_DIR = os.path.join(WHISPER_MODEL_DIR, "faster-whisper")
+
+def _normalize(whisper_result: Dict) -> str:
+    transcript = whisper_result[0]
+    transcript = [info["text"] for info in transcript]
+    transcript = ' '.join(transcript)
+    return transcript
 
 def process(
-        engine: Engines,
-        engine_params: Dict[str, Any],
+        engine: WhisperWebUIFasterWhisperEngine,
+        whisper_params: WhisperValues,
         dataset: Datasets,
         dataset_folder: str,
-        indices: Sequence[int]) -> WorkerResult:
-    engine = Engine.create(engine, **engine_params)
+        indices: Sequence[int],
+    ) -> WorkerResult:
     dataset = Dataset.create(dataset, folder=dataset_folder)
     normalizer = Normalizer()
 
@@ -31,17 +50,17 @@ def process(
     for index in indices:
         audio_path, ref_transcript = dataset.get(index)
 
-        transcript = engine.transcribe(audio_path)
+        transcript = engine.transcribe(audio_path, whisper_params)
 
         ref_sentence = ref_transcript.strip('\n ').lower()
         ref_words = normalizer.to_american(normalizer.normalize_abbreviations(ref_sentence)).split()
         transcribed_sentence = transcript.strip('\n ').lower()
         transcribed_words = normalizer.to_american(normalizer.normalize_abbreviations(transcribed_sentence)).split()
+        print("Ref Words: ", ref_words)
+        print("Res Words: ", transcribed_words)
 
         error_count += editdistance.eval(ref_words, transcribed_words)
         word_count += len(ref_words)
-
-    engine.delete()
 
     return WorkerResult(
         num_errors=error_count,
@@ -52,7 +71,7 @@ def process(
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument('--engine', required=True, choices=[x.value for x in Engines])
+    parser.add_argument('--engine', required=True)
     parser.add_argument('--dataset', required=True, choices=[x.value for x in Datasets])
     parser.add_argument('--dataset-folder', required=True)
     parser.add_argument('--aws-profile')
@@ -68,7 +87,41 @@ def main():
     parser.add_argument('--num-workers', type=int, default=os.cpu_count())
     args = parser.parse_args()
 
-    engine = Engines(args.engine)
+    engine = WhisperWebUIFasterWhisperEngine(
+        model_dir=FASTER_WHISPER_MODEL_DIR,
+    )
+    whisper_params = WhisperValues(
+        model_size="large-v2",
+        beam_size=5,
+        best_of=5,
+        compute_type="float16",
+    )
+    whisper_params_w_vad = WhisperValues(
+        model_size="large-v2",
+        beam_size=5,
+        best_of=5,
+        compute_type="float16",
+        # VAD
+        vad_filter=True,
+        threshold=0.5,
+        min_silence_duration_ms=1000,
+        speech_pad_ms = 1000
+    )
+    whisper_params_w_vad_bgm_separation = WhisperValues(
+        model_size="large-v2",
+        beam_size=5,
+        best_of=5,
+        compute_type="float16",
+        # VAD
+        vad_filter=True,
+        threshold=0.5,
+        min_silence_duration_ms=1000,
+        speech_pad_ms=1000,
+        # BGM Separation (MDX model)
+        is_bgm_separate=True,
+        uvr_model_size="UVR-MDX-NET-Inst_HQ_4"
+    )
+
     dataset_type = Datasets(args.dataset)
     dataset_folder = args.dataset_folder
     num_examples = args.num_examples
@@ -101,44 +154,44 @@ def main():
             raise ValueError("`watson-speech-to-text-api-key` and `watson-speech-to-text-url` are required")
         engine_params['watson_speech_to_text_api_key'] = args.watson_speech_to_text_api_key
         engine_params['watson_speech_to_text_url'] = args.watson_speech_to_text_url
+    else:
+        print(f"Transcript via {engine.__class__.__name__}:")
 
     dataset = Dataset.create(dataset_type, folder=dataset_folder)
     indices = list(range(dataset.size()))
-    random.shuffle(indices)
-    if args.num_examples is not None:
-        indices = indices[:num_examples]
+    print(f"Dataset size: {len(indices)}")
 
-    chunk = math.ceil(len(indices) / num_workers)
+    res = process(
+        engine=engine,
+        whisper_params=whisper_params_w_vad,
+        dataset=dataset_type,
+        dataset_folder=dataset_folder,
+        indices=indices[:],
+    )
+    num_errors = res.num_errors
+    num_words = res.num_words
 
-    futures = []
-    with ProcessPoolExecutor(num_workers) as executor:
-        for i in range(num_workers):
-            future = executor.submit(
-                process,
-                engine=engine,
-                engine_params=engine_params,
-                dataset=dataset_type,
-                dataset_folder=dataset_folder,
-                indices=indices[i * chunk: (i + 1) * chunk]
-            )
-            futures.append(future)
-
-    res = [x.result() for x in futures]
-
-    num_errors = sum(x.num_errors for x in res)
-    num_words = sum(x.num_words for x in res)
-
-    rtf = sum(x.process_sec for x in res) / sum(x.audio_sec for x in res)
+    rtf = res.process_sec / res.audio_sec
     word_error_rate = 100 * float(num_errors) / num_words
 
-    results_log_path = os.path.join(RESULTS_FOLDER, dataset_type.value, f"{str(engine)}.log")
+    print(f'WER: {word_error_rate:.2f}')
+    print(f'RTF: {rtf}')
+    print(f'NUM_ERROR: {num_errors}')
+    print(f'NUM_WORDS: {num_words}')
+    print(f'PROCESS_SEC: {res.process_sec}')
+    print(f'AUDIO_SEC: {res.audio_sec}')
+
+    results_log_path = os.path.join(RESULTS_FOLDER, dataset_type.value, f"{str(engine)}_w-vad-uvr.log")
     os.makedirs(os.path.dirname(results_log_path), exist_ok=True)
     with open(results_log_path, "w") as f:
         f.write(f"WER: {str(word_error_rate)}\n")
         f.write(f"RTF: {str(rtf)}\n")
+        f.write(f"DATASET: {dataset_type.value}\n")
+        f.write(f"NUM_ERROR: {str(num_errors)}\n")
+        f.write(f"NUM_WORDS: {str(num_words)}\n")
+        f.write(f"PROCESS_SEC: {res.process_sec}\n")
+        f.write(f"AUDIO_SEC: {res.audio_sec}\n")
 
-    print(f'WER: {word_error_rate:.2f}')
-    print(f'RTF: {rtf}')
 
 
 if __name__ == '__main__':
