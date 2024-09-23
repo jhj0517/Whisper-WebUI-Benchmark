@@ -487,23 +487,38 @@ class WhisperWebUIFasterWhisperEngine:
         self._audio_sec = 0.
         self._proc_sec = 0.
 
-    def transcribe(self, path: str, params: WhisperValues) -> str:
-        params = list(asdict(params).values())
+    def transcribe(self, path: str, params: WhisperValues | Dict) -> str:
+        if isinstance(params, WhisperValues):
+            params = list(asdict(params).values())
+        elif isinstance(params, Dict):
+            params = list(params.values())
         audio, sample_rate = soundfile.read(path, dtype='int16')
         self._audio_sec += audio.size / sample_rate
 
         start_sec = time.time()
         res = self._inferencer.transcribe(path, gr.Progress(), *params)
         self._proc_sec += time.time() - start_sec
+        res = self._to_str(res)
         res = self._normalize(res)
         return res
 
     @staticmethod
-    def _normalize(whisper_result: Dict) -> str:
+    def _to_str(whisper_result: Dict) -> str:
         transcript = whisper_result[0]
         transcript = [info["text"] for info in transcript]
         transcript = ' '.join(transcript)
         return transcript
+
+    @staticmethod
+    def _normalize(text: str) -> str:
+        p = inflect.engine()
+        text = text.translate(str.maketrans('', '', string.punctuation.replace("'", "").replace("-", ""))).lower()
+        text = text.replace("-", " ")
+
+        def num2txt(y):
+            return p.number_to_words(y).replace('-', ' ').replace(',', '') if any(c.isdigit() for c in y) else y
+
+        return ' '.join(num2txt(x) for x in text.split())
 
     def audio_sec(self) -> float:
         return self._audio_sec
