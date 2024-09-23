@@ -4,6 +4,8 @@ import string
 import time
 import uuid
 from enum import Enum
+from typing import Dict
+from dataclasses import dataclass, asdict
 
 import azure.cognitiveservices.speech as speechsdk
 import boto3
@@ -17,6 +19,13 @@ import whisper
 from google.cloud import speech
 from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
 from ibm_watson import SpeechToTextV1
+import gradio as gr
+
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), 'Whisper-WebUI'))
+from modules.whisper.faster_whisper_inference import FasterWhisperInference
+from modules.whisper.whisper_base import WhisperBase
+from modules.whisper.whisper_parameter import WhisperValues
 
 NUM_THREADS = 1
 os.environ["OMP_NUM_THREADS"] = str(NUM_THREADS)
@@ -472,4 +481,37 @@ class PicovoiceLeopardEngine(Engine):
         return 'Picovoice Leopard'
 
 
-__all__ = ['Engines', 'Engine']
+class WhisperWebUIFasterWhisperEngine:
+    def __init__(self, model_dir: str):
+        self._inferencer = FasterWhisperInference(model_dir=model_dir)
+        self._audio_sec = 0.
+        self._proc_sec = 0.
+
+    def transcribe(self, path: str, params: WhisperValues) -> str:
+        params = list(asdict(params).values())
+        audio, sample_rate = soundfile.read(path, dtype='int16')
+        self._audio_sec += audio.size / sample_rate
+
+        start_sec = time.time()
+        res = self._inferencer.transcribe(path, gr.Progress(), *params)
+        self._proc_sec += time.time() - start_sec
+        res = self._normalize(res)
+        return res
+
+    @staticmethod
+    def _normalize(whisper_result: Dict) -> str:
+        transcript = whisper_result[0]
+        transcript = [info["text"] for info in transcript]
+        transcript = ' '.join(transcript)
+        return transcript
+
+    def audio_sec(self) -> float:
+        return self._audio_sec
+
+    def process_sec(self) -> float:
+        return self._proc_sec
+
+    def delete(self) -> None:
+        self._inferencer.delete()
+
+__all__ = ['Engines', 'Engine', 'WhisperWebUIFasterWhisperEngine']
