@@ -482,8 +482,8 @@ class PicovoiceLeopardEngine(Engine):
 
 
 class WhisperWebUIFasterWhisperEngine:
-    def __init__(self, model_dir: str):
-        self._inferencer = FasterWhisperInference(model_dir=model_dir)
+    def __init__(self, model_dir: str, uvr_model_dir: str):
+        self._inferencer = FasterWhisperInference(model_dir=model_dir, uvr_model_dir=uvr_model_dir)
         self._audio_sec = 0.
         self._proc_sec = 0.
 
@@ -496,7 +496,7 @@ class WhisperWebUIFasterWhisperEngine:
         self._audio_sec += audio.size / sample_rate
 
         start_sec = time.time()
-        res = self._inferencer.transcribe(path, gr.Progress(), *params)
+        res = self._inferencer.run(path, gr.Progress(), False, *params)
         self._proc_sec += time.time() - start_sec
         res = self._to_str(res)
         res = self._normalize(res)
