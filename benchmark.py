@@ -26,7 +26,7 @@ from modules.whisper.whisper_parameter import WhisperValues
 WorkerResult = namedtuple('WorkerResult', ['num_errors', 'num_words', 'audio_sec', 'process_sec'])
 RESULTS_FOLDER = os.path.join(os.path.dirname(__file__), "results")
 
-WHISPER_MODEL_DIR = "Whisper-WebUI/models"
+WHISPER_MODEL_DIR = "./Whisper-WebUI/models/Whisper"
 FASTER_WHISPER_MODEL_DIR = os.path.join(WHISPER_MODEL_DIR, "faster-whisper")
 
 def _normalize(whisper_result: Dict) -> str:
@@ -48,6 +48,7 @@ def process(
     error_count = 0
     word_count = 0
     for index in indices:
+        print(f"Processing {index + 1}/{len(indices)}", flush=True)
         audio_path, ref_transcript = dataset.get(index)
 
         transcript = engine.transcribe(audio_path, whisper_params)
@@ -89,29 +90,33 @@ def main():
 
     engine = WhisperWebUIFasterWhisperEngine(
         model_dir=FASTER_WHISPER_MODEL_DIR,
+        uvr_model_dir="C:\\Whisper_Project\\Whisper-WebUI\\models\\UVR",
     )
     whisper_params = WhisperValues(
         model_size="large-v2",
         beam_size=5,
         best_of=5,
         compute_type="float16",
+        lang="english",
     )
     whisper_params_w_vad = WhisperValues(
         model_size="large-v2",
         beam_size=5,
         best_of=5,
         compute_type="float16",
+        lang="english",
         # VAD
         vad_filter=True,
         threshold=0.5,
         min_silence_duration_ms=1000,
-        speech_pad_ms = 1000
+        speech_pad_ms=1000
     )
     whisper_params_w_vad_bgm_separation = WhisperValues(
         model_size="large-v2",
         beam_size=5,
         best_of=5,
         compute_type="float16",
+        lang="english",
         # VAD
         vad_filter=True,
         threshold=0.5,
@@ -163,7 +168,7 @@ def main():
 
     res = process(
         engine=engine,
-        whisper_params=whisper_params_w_vad,
+        whisper_params=whisper_params_w_vad_bgm_separation,
         dataset=dataset_type,
         dataset_folder=dataset_folder,
         indices=indices[:],
@@ -181,7 +186,7 @@ def main():
     print(f'PROCESS_SEC: {res.process_sec}')
     print(f'AUDIO_SEC: {res.audio_sec}')
 
-    results_log_path = os.path.join(RESULTS_FOLDER, dataset_type.value, f"{str(engine)}_w-vad-uvr.log")
+    results_log_path = os.path.join(RESULTS_FOLDER, dataset_type.value, f"{str(engine)}_w-vad-bgm-separation.log")
     os.makedirs(os.path.dirname(results_log_path), exist_ok=True)
     with open(results_log_path, "w") as f:
         f.write(f"WER: {str(word_error_rate)}\n")
