@@ -125,7 +125,8 @@ def main():
         speech_pad_ms=1000,
         # BGM Separation (MDX model)
         is_bgm_separate=True,
-        uvr_model_size="UVR-MDX-NET-Inst_HQ_4"
+        uvr_model_size="UVR-MDX-NET-Inst_HQ_4",
+        uvr_enable_offload=False
     )
 
     dataset_type = Datasets(args.dataset)
