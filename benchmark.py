@@ -26,8 +26,9 @@ from modules.whisper.whisper_parameter import WhisperValues
 WorkerResult = namedtuple('WorkerResult', ['num_errors', 'num_words', 'audio_sec', 'process_sec'])
 RESULTS_FOLDER = os.path.join(os.path.dirname(__file__), "results")
 
-WHISPER_MODEL_DIR = "./Whisper-WebUI/models/Whisper"
-FASTER_WHISPER_MODEL_DIR = os.path.join(WHISPER_MODEL_DIR, "faster-whisper")
+WHISPER_WEBUI_MODEL_DIR = "./Whisper-WebUI/models"
+FASTER_WHISPER_MODEL_DIR = os.path.join(WHISPER_WEBUI_MODEL_DIR, "Whisper", "faster-whisper")
+UVR_MODEL_DIR = os.path.join(WHISPER_WEBUI_MODEL_DIR, "UVR")
 
 def _normalize(whisper_result: Dict) -> str:
     transcript = whisper_result[0]
@@ -90,7 +91,7 @@ def main():
 
     engine = WhisperWebUIFasterWhisperEngine(
         model_dir=FASTER_WHISPER_MODEL_DIR,
-        uvr_model_dir="C:\\Whisper_Project\\Whisper-WebUI\\models\\UVR",
+        uvr_model_dir=UVR_MODEL_DIR,
     )
     whisper_params = WhisperValues(
         model_size="large-v2",
