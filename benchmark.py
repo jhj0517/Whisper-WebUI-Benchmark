@@ -134,12 +134,15 @@ def main():
     if args.vad:
         whisper_params = whisper_params_w_vad
         results_log_file_name = f"{str(engine)}-vad.log"
+        print("Run benchmark with VAD preprocessing")
     elif args.uvr_vad:
         whisper_params = whisper_params_w_vad_bgm_separation
         results_log_file_name = f"{str(engine)}-vad_w_bgm_separation.log"
+        print("Run benchmark with VAD+ UVR BGM Separation preprocessing")
     else:
         whisper_params = whisper_params
         results_log_file_name = f"{str(engine)}.log"
+        print("Run benchmark without any preprocessing")
 
     dataset_type = Datasets(args.dataset)
     dataset_folder = args.dataset_folder
