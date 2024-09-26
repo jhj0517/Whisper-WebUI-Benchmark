@@ -87,6 +87,8 @@ def main():
     parser.add_argument('--watson-speech-to-text-url')
     parser.add_argument('--num-examples', type=int, default=None)
     parser.add_argument('--num-workers', type=int, default=os.cpu_count())
+    parser.add_argument('--vad', action='store_true', help='Enable VAD sub model usage')
+    parser.add_argument('--uvr_vad', action='store_true', help='Enable VAD + UVR sub model usage')
     args = parser.parse_args()
 
     engine = WhisperWebUIFasterWhisperEngine(
@@ -129,6 +131,16 @@ def main():
         uvr_enable_offload=False
     )
 
+    if args.vad:
+        whisper_params = whisper_params_w_vad
+        results_log_file_name = f"{str(engine)}-vad.log"
+    elif args.uvr_vad:
+        whisper_params = whisper_params_w_vad_bgm_separation
+        results_log_file_name = f"{str(engine)}-vad_w_bgm_separation.log"
+    else:
+        whisper_params = whisper_params
+        results_log_file_name = f"{str(engine)}.log"
+
     dataset_type = Datasets(args.dataset)
     dataset_folder = args.dataset_folder
     num_examples = args.num_examples
@@ -170,7 +182,7 @@ def main():
 
     res = process(
         engine=engine,
-        whisper_params=whisper_params_w_vad_bgm_separation,
+        whisper_params=whisper_params,
         dataset=dataset_type,
         dataset_folder=dataset_folder,
         indices=indices[:],
@@ -188,7 +200,7 @@ def main():
     print(f'PROCESS_SEC: {res.process_sec}')
     print(f'AUDIO_SEC: {res.audio_sec}')
 
-    results_log_path = os.path.join(RESULTS_FOLDER, dataset_type.value, f"{str(engine)}_w-vad-bgm-separation.log")
+    results_log_path = os.path.join(RESULTS_FOLDER, dataset_type.value, results_log_file_name)
     os.makedirs(os.path.dirname(results_log_path), exist_ok=True)
     with open(results_log_path, "w") as f:
         f.write(f"WER: {str(word_error_rate)}\n")
@@ -198,7 +210,6 @@ def main():
         f.write(f"NUM_WORDS: {str(num_words)}\n")
         f.write(f"PROCESS_SEC: {res.process_sec}\n")
         f.write(f"AUDIO_SEC: {res.audio_sec}\n")
-
 
 
 if __name__ == '__main__':
