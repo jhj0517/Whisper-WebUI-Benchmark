@@ -108,9 +108,9 @@ def main():
         lang="english",
         # VAD
         vad_filter=True,
-        threshold=0.5,
-        min_silence_duration_ms=1000,
-        speech_pad_ms=1000
+        threshold=0.4,
+        min_silence_duration_ms=500,
+        speech_pad_ms=2000
     )
     whisper_params_w_vad_bgm_separation = WhisperValues(
         model_size="large-v2",
@@ -120,9 +120,9 @@ def main():
         lang="english",
         # VAD
         vad_filter=True,
-        threshold=0.5,
-        min_silence_duration_ms=1000,
-        speech_pad_ms=1000,
+        threshold=0.4,
+        min_silence_duration_ms=500,
+        speech_pad_ms=2000,
         # BGM Separation (MDX model)
         is_bgm_separate=True,
         uvr_model_size="UVR-MDX-NET-Inst_HQ_4",
