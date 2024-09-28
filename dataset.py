@@ -14,6 +14,7 @@ class Datasets(Enum):
     LIBRI_SPEECH_TEST_CLEAN = 'LIBRI_SPEECH_TEST_CLEAN'
     LIBRI_SPEECH_TEST_OTHER = 'LIBRI_SPEECH_TEST_OTHER'
     TED_LIUM = 'TED_LIUM'
+    VOXCELEB_TEST = 'VOXCELEB_TEST'
 
 
 class Dataset(object):
@@ -36,6 +37,8 @@ class Dataset(object):
             return LibriSpeechTestOtherDataset(folder)
         elif x is Datasets.TED_LIUM:
             return TEDLIUMDataset(folder)
+        elif x is Datasets.VOXCELEB_TEST:
+            return VoxCelebTestDataset(folder)
         else:
             raise ValueError(f"Cannot create {cls.__name__} of type `{x}`")
 
@@ -179,6 +182,44 @@ class TEDLIUMDataset(Dataset):
 
     def __str__(self) -> str:
         return 'TED-LIUM'
+
+
+class VoxCelebTestDataset(Dataset):
+    def __init__(self, folder: str):
+        self._data = list()
+        with open(os.path.join(folder, 'test.tsv')) as f:
+            reader: csv.DictReader = csv.DictReader(f, delimiter='\t')
+            for row in reader:
+                mp3_path = os.path.join(folder, 'clips', row['path'])
+                flac_path = mp3_path.replace('.mp3', '.flac')
+                if not os.path.exists(flac_path):
+                    args = [
+                        'ffmpeg',
+                        '-i',
+                        mp3_path,
+                        '-ac', '1',
+                        '-ar', '16000',
+                        flac_path,
+                    ]
+                    subprocess.check_output(args)
+                elif soundfile.read(flac_path)[0].size > 16000 * 60:
+                    continue
+
+                try:
+                    self._data.append((flac_path, Normalizer.normalize(row['sentence'])))
+                except RuntimeError:
+                    continue
+
+    def size(self) -> int:
+        return len(self._data)
+
+    def get(self, index: int) -> Tuple[str, str]:
+        return self._data[index]
+
+    def __str__(self) -> str:
+        return 'VoxCeleb Test'
+
+
 
 
 __all__ = ['Datasets', 'Dataset']
