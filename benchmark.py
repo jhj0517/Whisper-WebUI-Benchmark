@@ -18,9 +18,7 @@ from normalizer import Normalizer
 
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), 'Whisper-WebUI'))
-from modules.whisper.faster_whisper_inference import FasterWhisperInference
-from modules.whisper.whisper_base import WhisperBase
-from modules.whisper.whisper_parameter import WhisperValues
+from modules.whisper.data_classes import TranscriptionPipelineParams, WhisperParams, VadParams, BGMSeparationParams
 
 
 WorkerResult = namedtuple('WorkerResult', ['num_errors', 'num_words', 'audio_sec', 'process_sec'])
@@ -38,7 +36,7 @@ def _normalize(whisper_result: Dict) -> str:
 
 def process(
         engine: WhisperWebUIFasterWhisperEngine,
-        whisper_params: WhisperValues,
+        whisper_params: TranscriptionPipelineParams,
         dataset: Datasets,
         dataset_folder: str,
         indices: Sequence[int],
@@ -73,7 +71,7 @@ def process(
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument('--engine', required=True)
+    parser.add_argument('--engine') #  WhisperWebUIFasterWhisperEngine is used by default
     parser.add_argument('--dataset', required=True, choices=[x.value for x in Datasets])
     parser.add_argument('--dataset-folder', required=True)
     parser.add_argument('--aws-profile')
@@ -95,40 +93,52 @@ def main():
         model_dir=FASTER_WHISPER_MODEL_DIR,
         uvr_model_dir=UVR_MODEL_DIR,
     )
-    whisper_params = WhisperValues(
-        model_size="large-v2",
-        beam_size=5,
-        best_of=5,
-        compute_type="float16",
-        lang="english",
+    whisper_params = TranscriptionPipelineParams(
+        whisper=WhisperParams(
+            model_size="large-v2",
+            beam_size=5,
+            best_of=5,
+            compute_type="float16",
+            lang="english",
+        )
     )
-    whisper_params_w_vad = WhisperValues(
-        model_size="large-v2",
-        beam_size=5,
-        best_of=5,
-        compute_type="float16",
-        lang="english",
+    whisper_params_w_vad = TranscriptionPipelineParams(
+        whisper=WhisperParams(
+            model_size="large-v2",
+            beam_size=5,
+            best_of=5,
+            compute_type="float16",
+            lang="english",
+        ),
         # VAD
-        vad_filter=True,
-        threshold=0.4,
-        min_silence_duration_ms=500,
-        speech_pad_ms=2000
+        vad=VadParams(
+            vad_filter=True,
+            threshold=0.4,
+            min_silence_duration_ms=500,
+            speech_pad_ms=2000
+        )
     )
-    whisper_params_w_vad_bgm_separation = WhisperValues(
-        model_size="large-v2",
-        beam_size=5,
-        best_of=5,
-        compute_type="float16",
-        lang="english",
+    whisper_params_w_vad_bgm_separation = TranscriptionPipelineParams(
+        whisper=WhisperParams(
+            model_size="large-v2",
+            beam_size=5,
+            best_of=5,
+            compute_type="float16",
+            lang="english",
+        ),
         # VAD
-        vad_filter=True,
-        threshold=0.4,
-        min_silence_duration_ms=500,
-        speech_pad_ms=2000,
+        vad=VadParams(
+            vad_filter=True,
+            threshold=0.4,
+            min_silence_duration_ms=500,
+            speech_pad_ms=2000
+        ),
         # BGM Separation (MDX model)
-        is_bgm_separate=True,
-        uvr_model_size="UVR-MDX-NET-Inst_HQ_4",
-        uvr_enable_offload=False
+        bgm_separation=BGMSeparationParams(
+            is_bgm_separate=True,
+            uvr_model_size="UVR-MDX-NET-Inst_HQ_4",
+            uvr_enable_offload=False
+        )
     )
 
     if args.vad:
