@@ -15,6 +15,7 @@ class Datasets(Enum):
     LIBRI_SPEECH_TEST_OTHER = 'LIBRI_SPEECH_TEST_OTHER'
     TED_LIUM = 'TED_LIUM'
     VOXCELEB_TEST = 'VOXCELEB_TEST'
+    JOE_SCHMO_SHOW = 'JOE_SCHMO_SHOW'
 
 
 class Dataset(object):
@@ -39,6 +40,8 @@ class Dataset(object):
             return TEDLIUMDataset(folder)
         elif x is Datasets.VOXCELEB_TEST:
             return VoxCelebTestDataset(folder)
+        elif x is Datasets.JOE_SCHMO_SHOW:
+            return JoeSchmoShowDataset(folder)
         else:
             raise ValueError(f"Cannot create {cls.__name__} of type `{x}`")
 
@@ -219,6 +222,55 @@ class VoxCelebTestDataset(Dataset):
     def __str__(self) -> str:
         return 'VoxCeleb Test'
 
+
+class JoeSchmoShowDataset(Dataset):
+    def __init__(self, folder: str):
+        self._data = list()
+        #  You can download the sample dataset from this URL
+        self._youtube_url = "https://www.youtube.com/watch?v=Eek0cOjLrV0&ab_channel=0517jhj"
+        self._transcript = """
+        FIRST FLAME OF LOVE EVICTION CEREMONY.
+        LOVE.
+        IT'S WHY WE'RE ALL HERE.
+        BUT TONIGHT,
+        ONE OF YOU WILL HAVE TO LET GO OF LOVE'S WARM BOSOM 
+        AND CLEAVE TO REJECTION'S COLD SHOULDERS.
+        WELCOME TO THE FIRST 
+        FLAME-
+        COMING UP NEXT ON JOE SCHMOE 2,
+        THE MOST SHOCKING EVICTION YET.
+        WELCOME TO THE-
+        """
+        for x in os.listdir(folder):
+            if x.endswith('.mp3'):
+                mp3_path = os.path.join(folder, x)
+                flac_path = mp3_path.replace('.mp3', '.flac')
+                if not os.path.exists(flac_path):
+                    args = [
+                        'ffmpeg',
+                        '-i',
+                        mp3_path,
+                        '-ac', '1',
+                        '-ar', '16000',
+                        flac_path,
+                    ]
+                    subprocess.check_output(args)
+                elif soundfile.read(flac_path)[0].size > 16000 * 60:
+                    continue
+
+        for x in os.listdir(folder):
+            if x.endswith('.flac'):
+                transcript = Normalizer.normalize(self._transcript)
+                self._data.append((os.path.join(folder, x), transcript))
+
+    def size(self) -> int:
+        return len(self._data)
+
+    def get(self, index: int) -> Tuple[str, str]:
+        return self._data[index]
+
+    def __str__(self) -> str:
+        return 'Joe Schmo Show'
 
 
 
