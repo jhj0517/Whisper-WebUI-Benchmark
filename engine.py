@@ -4,7 +4,7 @@ import string
 import time
 import uuid
 from enum import Enum
-from typing import Dict
+from typing import Dict, List
 from dataclasses import dataclass, asdict
 
 import azure.cognitiveservices.speech as speechsdk
@@ -24,7 +24,8 @@ import gradio as gr
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), 'Whisper-WebUI'))
 from modules.whisper.faster_whisper_inference import FasterWhisperInference
-from modules.whisper.data_classes import TranscriptionPipelineParams, WhisperParams, VadParams, BGMSeparationParams
+from modules.whisper.data_classes import (TranscriptionPipelineParams, WhisperParams, VadParams, BGMSeparationParams,
+                                          Segment)
 
 NUM_THREADS = 1
 os.environ["OMP_NUM_THREADS"] = str(NUM_THREADS)
@@ -502,9 +503,9 @@ class WhisperWebUIFasterWhisperEngine:
         return res
 
     @staticmethod
-    def _to_str(whisper_result: Dict) -> str:
+    def _to_str(whisper_result: List[Segment]) -> str:
         transcript = whisper_result[0]
-        transcript = [info["text"] for info in transcript]
+        transcript = [info.text for info in transcript]
         transcript = ' '.join(transcript)
         return transcript
 
