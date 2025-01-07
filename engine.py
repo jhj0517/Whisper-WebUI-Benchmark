@@ -495,7 +495,7 @@ class WhisperWebUIFasterWhisperEngine:
         self._audio_sec += audio.size / sample_rate
 
         start_sec = time.time()
-        res = self._inferencer.run(path, gr.Progress(), False, *params)
+        res = self._inferencer.run(path, gr.Progress(), "SRT", False, *params)
         self._proc_sec += time.time() - start_sec
         res = self._to_str(res)
         res = self._normalize(res)
