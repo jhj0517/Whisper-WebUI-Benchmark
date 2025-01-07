@@ -24,8 +24,7 @@ import gradio as gr
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), 'Whisper-WebUI'))
 from modules.whisper.faster_whisper_inference import FasterWhisperInference
-from modules.whisper.whisper_base import WhisperBase
-from modules.whisper.whisper_parameter import WhisperValues
+from modules.whisper.data_classes import TranscriptionPipelineParams, WhisperParams, VadParams, BGMSeparationParams
 
 NUM_THREADS = 1
 os.environ["OMP_NUM_THREADS"] = str(NUM_THREADS)
@@ -487,9 +486,9 @@ class WhisperWebUIFasterWhisperEngine:
         self._audio_sec = 0.
         self._proc_sec = 0.
 
-    def transcribe(self, path: str, params: WhisperValues | Dict) -> str:
-        if isinstance(params, WhisperValues):
-            params = list(asdict(params).values())
+    def transcribe(self, path: str, params: TranscriptionPipelineParams | Dict) -> str:
+        if isinstance(params, TranscriptionPipelineParams):
+            params = params.to_list()
         elif isinstance(params, Dict):
             params = list(params.values())
         audio, sample_rate = soundfile.read(path, dtype='int16')
